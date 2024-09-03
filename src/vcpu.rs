@@ -94,6 +94,10 @@ impl axvcpu::AxArchVCpu for Aarch64VCpu {
     fn unbind(&mut self) -> AxResult {
         Ok(())
     }
+
+    fn set_gpr(&mut self, idx: usize, val: usize) {
+        self.ctx.set_gpr(idx, val);
+    }
 }
 
 // Private function
