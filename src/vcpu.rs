@@ -3,6 +3,7 @@ use core::marker::PhantomData;
 use aarch64_cpu::registers::{CNTHCTL_EL2, HCR_EL2, SPSR_EL1, SP_EL0, VTCR_EL2};
 use tock_registers::interfaces::{ReadWriteable, Readable, Writeable};
 
+use arm_gicv2::get_gich;
 use axaddrspace::{GuestPhysAddr, HostPhysAddr};
 use axerrno::AxResult;
 use axvcpu::{AxVCpuExitReason, AxVCpuHal};
@@ -137,6 +138,11 @@ impl<H: AxVCpuHal> axvcpu::AxArchVCpu for Aarch64VCpu<H> {
 
     fn set_gpr(&mut self, idx: usize, val: usize) {
         self.ctx.set_gpr(idx, val);
+    }
+
+    fn inject_interrupt(&mut self, vector: usize) -> AxResult {
+        let mut gich = get_gich().lock();
+        gich.inject_interrupt(vector as u32);
     }
 }
 
