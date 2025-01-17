@@ -17,3 +17,5 @@ aarch64_sysreg = "0.1.1"
 
 axaddrspace = { git = "https://github.com/arceos-hypervisor/axaddrspace.git" }
 axvcpu = { git = "https://github.com/arceos-hypervisor/axvcpu.git" }
+axdevice = { git = "https://github.com/arceos-hypervisor/axdevice.git" }
+axhal = { git = "https://github.com/arceos-hypervisor/arceos.git", branch = "vmm" }

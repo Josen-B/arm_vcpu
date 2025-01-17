@@ -1,16 +1,16 @@
 use core::marker::PhantomData;
 
-use aarch64_cpu::registers::{CNTHCTL_EL2, HCR_EL2, SP_EL0, SPSR_EL1, VTCR_EL2};
+use aarch64_cpu::registers::{CNTHCTL_EL2, HCR_EL2, SPSR_EL1, SP_EL0, VTCR_EL2};
 use tock_registers::interfaces::{ReadWriteable, Readable, Writeable};
 
 use axaddrspace::{GuestPhysAddr, HostPhysAddr};
 use axerrno::AxResult;
 use axvcpu::{AxVCpuExitReason, AxVCpuHal};
 
-use crate::TrapFrame;
 use crate::context_frame::GuestSystemRegisters;
-use crate::exception::{TrapKind, handle_exception_sync};
+use crate::exception::{handle_exception_sync, TrapKind};
 use crate::exception_utils::exception_class_value;
+use crate::TrapFrame;
 
 #[percpu::def_percpu]
 static HOST_SP_EL0: u64 = 0;
@@ -151,9 +151,13 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
             + VTCR_EL2::SL0.val(0b01)
             + VTCR_EL2::T0SZ.val(64 - 39))
         .into();
-        self.guest_system_regs.hcr_el2 =
-            (HCR_EL2::VM::Enable + HCR_EL2::RW::EL1IsAarch64 + HCR_EL2::TSC::EnableTrapEl1SmcToEl2)
-                .into();
+        self.guest_system_regs.hcr_el2 = (HCR_EL2::VM::Enable
+            + HCR_EL2::RW::EL1IsAarch64
+            + HCR_EL2::IMO::EnableVirtualIRQ
+            + HCR_EL2::FMO::EnableVirtualFIQ
+            + HCR_EL2::TSC::EnableTrapEl1SmcToEl2
+            + HCR_EL2::RW::EL1IsAarch64)
+            .into();
         // self.system_regs.hcr_el2 |= 1<<27;
         // + HCR_EL2::IMO::EnableVirtualIRQ).into();
 
@@ -203,7 +207,13 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
         }
 
         // the dummy return value, the real return value is in x0 when `return_run_guest` returns
-        0
+        let exit_reason: usize;
+        core::arch::asm!(
+            "mov {}, x0",
+            out(reg) exit_reason,
+            options(nostack)
+        );
+        exit_reason
     }
 
     /// Restores guest system control registers.
