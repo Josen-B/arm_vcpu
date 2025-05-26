@@ -10,6 +10,7 @@ use crate::exception_utils::exception_class_value;
 use axaddrspace::{GuestPhysAddr, HostPhysAddr};
 use axerrno::AxResult;
 use axvcpu::{AxVCpuExitReason, AxVCpuHal};
+use arm_vgic::Vgic;
 
 #[percpu::def_percpu]
 static HOST_SP_EL0: u64 = 0;
@@ -47,6 +48,8 @@ pub struct Aarch64VCpu<H: AxVCpuHal> {
     /// The MPIDR_EL1 value for the vCPU.
     mpidr: u64,
     _phantom: PhantomData<H>,
+    /// ARM Virtual Generic Interrupt Controller v2 (VGIC)
+    vgic: Vgic,
 }
 
 /// Configuration for creating a new `Aarch64VCpu`
@@ -75,6 +78,7 @@ impl<H: AxVCpuHal> axvcpu::AxArchVCpu for Aarch64VCpu<H> {
             guest_system_regs: GuestSystemRegisters::default(),
             mpidr: config.mpidr_el1,
             _phantom: PhantomData,
+            vgic: Vgic::new(),
         })
     }
 
@@ -106,7 +110,35 @@ impl<H: AxVCpuHal> axvcpu::AxArchVCpu for Aarch64VCpu<H> {
         };
 
         let trap_kind = TrapKind::try_from(exit_reson as u8).expect("Invalid TrapKind");
-        self.vmexit_handler(trap_kind)
+        let axvcpu_reason: Result<AxVCpuExitReason, axerrno::AxError> = self.vmexit_handler(trap_kind);
+        if let Ok(e) = axvcpu_reason {
+            match e {
+                // Handle the VM-Exit reason.
+                AxVCpuExitReason::MmioWrite { addr, width,data } => {
+                    if self.vgic.address_range().contains(addr) {
+                        // Handle MMIO write to VGIC.
+                        self.vgic.handle_write(addr, width, data)?;
+                        return Ok(AxVCpuExitReason::Nothing);
+                    } else {
+                        return Ok(e);
+                    }
+                }
+                AxVCpuExitReason::MmioRead { addr, width, reg, reg_width } => {
+                    if self.vgic.address_range().contains(addr) {
+                        // Handle MMIO read from VGIC.
+                        let data = self.vgic.handle_read(addr, width, reg, reg_width)?;
+                        self.ctx.set_gpr(reg, data);
+                        return Ok(AxVCpuExitReason::Nothing);
+                    } else {
+                        return Ok(e);
+                    }
+                }
+                _ => {
+                    // Handle other VM-Exit reasons.
+                    return Ok(e);
+                }
+            }
+        }
     }
 
     fn bind(&mut self) -> AxResult {
