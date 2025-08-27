@@ -171,25 +171,12 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
         // - 4KiB granule (TG0)
         // - 39-bit address space (T0_SZ)
         // - start at level 1 (SL0)
-        // self.guest_system_regs.vtcr_el2 = (VTCR_EL2::PS::PA_40B_1TB
-        //     + VTCR_EL2::TG0::Granule4KB
-        //     + VTCR_EL2::SH0::Inner
-        //     + VTCR_EL2::ORGN0::NormalWBRAWA
-        //     + VTCR_EL2::IRGN0::NormalWBRAWA
-        //     + VTCR_EL2::SL0.val(0b01)
-        //     + VTCR_EL2::T0SZ.val(64 - 39))
-        // .into();
-
-        // use 4 level ept paging
-        // - 4KiB granule (TG0)
-        // - 48-bit address space (T0_SZ)
-        // - start at level 0 (SL0)
-        self.guest_system_regs.vtcr_el2 = (VTCR_EL2::PS::PA_48B_256TB
+        self.guest_system_regs.vtcr_el2 = (VTCR_EL2::PS::PA_40B_1TB
             + VTCR_EL2::TG0::Granule4KB
             + VTCR_EL2::SH0::Inner
             + VTCR_EL2::ORGN0::NormalWBRAWA
             + VTCR_EL2::IRGN0::NormalWBRAWA
-            + VTCR_EL2::SL0.val(0b10) // 0b10 means start at level 0
+            + VTCR_EL2::SL0.val(0b01)
             + VTCR_EL2::T0SZ.val(64 - 48))
         .into();
 
